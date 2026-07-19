@@ -12,21 +12,23 @@ const VALID_TYPES: FingerprintSignalType[] = [
   "body_path",
 ];
 
-export function parseFingerprintSignalsToRows(raw: string): FingerprintSignalRow[] {
-  if (!raw || !raw.trim()) return [];
-  try {
-    const arr = JSON.parse(raw);
-    if (!Array.isArray(arr)) return [];
-    return arr.map((e) => ({
-      type: VALID_TYPES.includes(e?.type) ? e.type : "header_exact",
-      match: Array.isArray(e?.match)
-        ? e.match.filter((x: unknown) => typeof x === "string").join(" / ")
-        : "",
-      required: e?.required === true,
-    }));
-  } catch {
+export function parseFingerprintSignalsToRows(raw: string | unknown[]): FingerprintSignalRow[] {
+  let arr: unknown[];
+  if (Array.isArray(raw)) {
+    arr = raw;
+  } else if (!raw || !raw.trim()) {
     return [];
+  } else {
+    try { arr = JSON.parse(raw); } catch { return []; }
+    if (!Array.isArray(arr)) return [];
   }
+  return arr.map((e) => ({
+    type: VALID_TYPES.includes(e?.type) ? e.type : "header_exact",
+    match: Array.isArray(e?.match)
+      ? e.match.filter((x: unknown) => typeof x === "string").join(" / ")
+      : "",
+    required: e?.required === true,
+  }));
 }
 
 export function serializeFingerprintRowsToJSON(rows: FingerprintSignalRow[]): string {

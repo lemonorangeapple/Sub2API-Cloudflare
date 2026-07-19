@@ -1,0 +1,9 @@
+node_modules/
+.wrangler/
+wrangler-output/
+wrangler-output.log
+coverage/
+*.tsbuildinfo
+*.log
+.dev.vars
+.dev.vars.*

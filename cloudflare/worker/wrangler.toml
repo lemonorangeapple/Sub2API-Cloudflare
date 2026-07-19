@@ -1,0 +1,37 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "sub2api-router"
+main = "src/index.ts"
+compatibility_date = "2026-07-15"
+workers_dev = true
+
+[triggers]
+crons = ["* * * * *"]
+
+[vars]
+EMAIL_TASK_BATCH_SIZE = "10"
+
+# Required secret. Configure it with:
+#   npx wrangler secret put EMAIL_TASK_ENCRYPTION_KEY
+#   npx wrangler secret put SMTP_PASSWORD
+#   npx wrangler secret put LINUXDO_CLIENT_SECRET
+# EMAIL_TASK_ENCRYPTION_KEY must be 64 hexadecimal characters and must match
+# the key used by authentication routes when they enqueue email tasks.
+# SMTP_PASSWORD overrides the transitional smtp_password D1 setting so the
+# production credential does not need to be stored as plaintext in D1.
+# LINUXDO_CLIENT_SECRET is used by the staged LinuxDo provider client after
+# the OAuth completion routes are jointly activated.
+
+# Temporary migration-only dependency. Remove this binding after every backend
+# route has a native Worker implementation.
+# [[services]]
+# binding = "BACKEND"
+# service = "sub2api-backend"
+# environment = "production"
+
+# Create the real D1 database before enabling this binding. Fake resource IDs
+# are intentionally not checked into the repository.
+[[d1_databases]]
+binding = "DB"
+database_name = "sub2api"
+database_id = "local-dev"  # wrangler dev 会自动使用本地 SQLite 模拟
+migrations_dir = "../d1/migrations"

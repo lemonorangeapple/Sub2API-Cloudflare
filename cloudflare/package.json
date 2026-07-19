@@ -1,0 +1,8 @@
+{
+    "name": "sub2api-cloudflare",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "test": "cd worker && npx tsx --test test/*.test.mjs"
+    }
+}

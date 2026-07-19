@@ -192,34 +192,18 @@ export default {
   // Setup Wizard
   setup: {
     title: 'Sub2API 安装向导',
-    description: '配置您的 Sub2API 实例',
-    database: {
-      title: '数据库配置',
-      description: '连接到您的 PostgreSQL 数据库',
-      host: '主机',
-      port: '端口',
-      username: '用户名',
-      password: '密码',
-      databaseName: '数据库名称',
-      sslMode: 'SSL 模式',
-      passwordPlaceholder: '密码',
-      ssl: {
-        disable: '禁用',
-        require: '要求',
-        verifyCa: '验证 CA',
-        verifyFull: '完全验证'
-      }
-    },
-    redis: {
-      title: 'Redis 配置',
-      description: '连接到您的 Redis 服务器',
-      host: '主机',
-      port: '端口',
-      password: '密码（可选）',
-      database: '数据库',
-      passwordPlaceholder: '密码',
-      enableTls: '启用 TLS',
-      enableTlsHint: '连接 Redis 时使用 TLS（公共 CA 证书）'
+    description: '初始化 Cloudflare Pages、Worker 与 D1 部署',
+    cloudflare: {
+      title: 'Cloudflare 环境',
+      description: '检查 Worker 是否可以访问 D1 数据库绑定',
+      database: 'Cloudflare D1',
+      databaseDescription: '保存应用数据与运行时状态',
+      runtime: 'Pages + Worker',
+      runtimeDescription: '静态前端与边缘 API 运行时',
+      ready: 'D1 绑定可用，当前尚未创建管理员。',
+      checking: '正在检查 D1 绑定...',
+      retry: '重新检查环境',
+      bindingMissing: 'Worker 无法访问 D1，请先配置 DB binding 再执行安装。'
     },
     admin: {
       title: '管理员账户',
@@ -233,21 +217,16 @@ export default {
     },
     ready: {
       title: '准备安装',
-      description: '检查您的配置并完成安装',
-      database: '数据库',
-      redis: 'Redis',
+      description: '在 Cloudflare D1 中创建首个管理员',
+      platform: '运行架构',
       adminEmail: '管理员邮箱'
     },
     status: {
-      testing: '测试中...',
-      success: '连接成功',
-      testConnection: '测试连接',
       installing: '安装中...',
       completeInstallation: '完成安装',
       completed: '安装完成！',
       redirecting: '正在跳转到登录页面...',
-      restarting: '服务正在重启，请稍候...',
-      timeout: '服务重启时间超出预期，请手动刷新页面。'
+      installFailed: '安装失败'
     }
   },
 

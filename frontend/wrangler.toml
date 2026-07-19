@@ -1,0 +1,9 @@
+name = "sub2api-frontend"
+pages_build_output_dir = "./dist"
+compatibility_date = "2026-07-15"
+send_metrics = false
+
+# 部署前在 Cloudflare Dashboard 或 wrangler secret 中设置：
+#   VITE_API_BASE_URL = https://sub2api-router.<your-subdomain>.workers.dev
+# 这样前端构建时会将 API 地址编译进静态资源，
+# 使 Pages 上的 SPA 能跨域请求 Worker 后端。

@@ -10,10 +10,10 @@ docs/claude-relay-service/
 *.dll
 *.so
 *.dylib
-backend/bin/
-backend/server
-backend/sub2api
-backend/main
+legacy/backend/bin/
+legacy/backend/server
+legacy/backend/sub2api
+legacy/backend/main
 
 # Go 测试二进制
 *.test
@@ -26,7 +26,7 @@ coverage.html
 vendor/
 
 # Go 编译缓存
-backend/.gocache/
+legacy/backend/.gocache/
 
 # ===================
 # Node.js / Vue 前端
@@ -83,6 +83,9 @@ temp/
 *.temp
 *.log
 *.bak
+# Windows/Git Bash stderr redirection artifacts (`2>nul`).
+/nul
+**/nul
 .cache/
 .dev/
 .serena/
@@ -97,45 +100,46 @@ release/
 # 后端嵌入的前端构建产物
 # Keep a placeholder file so `//go:embed all:dist` always has a match in CI/lint,
 # while still ignoring generated frontend build outputs.
-backend/internal/web/dist/
-!backend/internal/web/dist/
-backend/internal/web/dist/*
-!backend/internal/web/dist/.keep
+legacy/backend/internal/web/dist/
+!legacy/backend/internal/web/dist/
+legacy/backend/internal/web/dist/*
+!legacy/backend/internal/web/dist/.keep
 
 # 后端运行时缓存数据
-backend/data/
+legacy/backend/data/
 
 # ===================
 # 本地配置文件（包含敏感信息）
 # ===================
-backend/config.yaml
-deploy/config.yaml
-backend/.installed
+legacy/backend/config.yaml
+legacy/deploy/config.yaml
+legacy/backend/.installed
 
 # ===================
 # 其他
 # ===================
 tests
-!deploy/tests/
-!deploy/tests/**
+!legacy/deploy/tests/
+!legacy/deploy/tests/**
 CLAUDE.md
 .claude
 scripts
-!backend/scripts/
-!backend/scripts/resolve-version.sh
+!legacy/backend/scripts/
+!legacy/backend/scripts/resolve-version.sh
+!cloudflare/scripts/
+!cloudflare/scripts/**
 .code-review-state
 #openspec/
 code-reviews/
 AGENTS.md
-backend/cmd/server/server
-deploy/docker-compose.override.yml
+legacy/backend/cmd/server/server
+legacy/deploy/docker-compose.override.yml
 .gocache/
 vite.config.js
 docs/*
 !docs/PAYMENT.md
 !docs/PAYMENT_CN.md
 !docs/ADMIN_PAYMENT_INTEGRATION_API.md
-!docs/ASYNC_IMAGE_TASKS.md
 !docs/legal/
 !docs/legal/*.md
 .serena/

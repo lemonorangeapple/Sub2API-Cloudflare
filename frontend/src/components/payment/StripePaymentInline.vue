@@ -111,7 +111,7 @@ let elementsInstance: StripeElements | null = null
 
 onMounted(async () => {
   try {
-    const { loadStripe } = await import('@stripe/stripe-js/pure')
+    const { loadStripe } = await import('@stripe/stripe-js')
     const stripe = await loadStripe(props.publishableKey)
     if (!stripe) { initError.value = t('payment.stripeLoadFailed'); return }
 

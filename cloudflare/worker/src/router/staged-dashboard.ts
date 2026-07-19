@@ -1,0 +1,198 @@
+import { D1AuthSessionRepository } from "../repositories/auth-sessions.ts";
+import { D1AuthUserRepository } from "../repositories/auth-users.ts";
+import { AccessAuthError, AccessAuthService } from "../services/access-auth.ts";
+import { D1DashboardRepositoryImpl } from "../repositories/dashboard.ts";
+import { D1DashboardService } from "../services/dashboard.ts";
+import { AuthTokenService } from "../services/auth-tokens.ts";
+import { Hs256JwtSigner, Hs256JwtVerifier } from "../services/jwt.ts";
+import type { D1Database } from "../types/d1.ts";
+import {
+    legacyError,
+    legacyInternalError,
+    legacySuccess,
+    middlewareAuthError,
+    routerError,
+} from "./responses.ts";
+
+function toSnakeCase(obj: Record<string, unknown>): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj)) {
+        const snakeKey = key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+        if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+            result[snakeKey] = toSnakeCase(value as Record<string, unknown>);
+        } else if (Array.isArray(value)) {
+            result[snakeKey] = value.map((v) => typeof v === "object" && v !== null ? toSnakeCase(v as Record<string, unknown>) : v);
+        } else {
+            result[snakeKey] = value;
+        }
+    }
+    return result;
+}
+
+const DASHBOARD_PATHS = {
+    snapshotV2: "/api/v1/admin/dashboard/snapshot-v2",
+    stats: "/api/v1/admin/dashboard/stats",
+    realtime: "/api/v1/admin/dashboard/realtime",
+    trend: "/api/v1/admin/dashboard/trend",
+    models: "/api/v1/admin/dashboard/models",
+    groups: "/api/v1/admin/dashboard/groups",
+    apiKeysTrend: "/api/v1/admin/dashboard/api-keys-trend",
+    usersTrend: "/api/v1/admin/dashboard/users-trend",
+    usersRanking: "/api/v1/admin/dashboard/users-ranking",
+    usersUsage: "/api/v1/admin/dashboard/users-usage",
+    apiKeysUsage: "/api/v1/admin/dashboard/api-keys-usage",
+    userBreakdown: "/api/v1/admin/dashboard/user-breakdown",
+    backfill: "/api/v1/admin/dashboard/aggregation/backfill",
+} as const;
+
+export interface StagedDashboardEnv {
+    DB?: D1Database;
+    JWT_SECRET?: string;
+    JWT_ACCESS_TOKEN_EXPIRES_SECONDS?: string;
+    JWT_REFRESH_TOKEN_EXPIRE_DAYS?: string;
+}
+
+function boundedIntegerEnv(value: string | undefined, defaultValue: number, min: number, max: number): number {
+    if (value === undefined || value.trim() === "") return defaultValue;
+    const parsed = Number.parseInt(value.trim(), 10);
+    if (!Number.isInteger(parsed)) return defaultValue;
+    return Math.min(max, Math.max(min, parsed));
+}
+
+export function isDashboardPath(path: string): boolean {
+    return path.startsWith("/api/v1/admin/dashboard");
+}
+
+async function authenticateAdmin(request: Request, env: StagedDashboardEnv, clock: () => number): Promise<{ userId: number; role: string }> {
+    const authHeader = request.headers.get("authorization");
+    if (!authHeader) throw new AccessAuthError("UNAUTHORIZED", "Missing authorization header");
+    const secret = env.JWT_SECRET?.trim() ?? "";
+    if (!secret) throw new AccessAuthError("UNAUTHORIZED", "JWT secret is not configured");
+    const users = new D1AuthUserRepository(env.DB!);
+    const sessions = new D1AuthSessionRepository(env.DB!);
+    const signer = new Hs256JwtSigner(secret, boundedIntegerEnv(env.JWT_ACCESS_TOKEN_EXPIRES_SECONDS, 24 * 60 * 60, 1, 7 * 24 * 60 * 60), clock);
+    const verifier = new Hs256JwtVerifier(secret, clock);
+    const tokens = new AuthTokenService(sessions, signer, boundedIntegerEnv(env.JWT_REFRESH_TOKEN_EXPIRE_DAYS, 30, 1, 365), clock);
+    const auth = new AccessAuthService(users, verifier, tokens, clock);
+    const subject = await auth.authenticateAuthorization(authHeader);
+    return { userId: subject.user.id, role: subject.user.role };
+}
+
+export async function routeStagedDashboard(
+    request: Request,
+    env: StagedDashboardEnv
+): Promise<Response | null> {
+    const url = new URL(request.url);
+    const pathname = url.pathname;
+    const method = request.method;
+
+    if (!isDashboardPath(pathname)) return null;
+    if (env.DB === undefined) return middlewareAuthError(503, "database_not_configured", "Configure the Cloudflare D1 DB binding");
+
+    try {
+        const auth = await authenticateAdmin(request, env, Date.now);
+        if (auth.role !== "admin") return middlewareAuthError(403, "FORBIDDEN", "Admin access required");
+
+        const repo = new D1DashboardRepositoryImpl(env.DB);
+        const svc = new D1DashboardService(repo);
+
+        const period = url.searchParams.get("period") ?? "day";
+        const granularity = url.searchParams.get("granularity") ?? "day";
+
+        if (pathname === DASHBOARD_PATHS.snapshotV2 && method === "GET") {
+            const snapshot = await svc.getSnapshotV2(period);
+            return legacySuccess(toSnakeCase(snapshot as unknown as Record<string, unknown>));
+        }
+
+        if (pathname === DASHBOARD_PATHS.stats && method === "GET") {
+            const stats = await svc.getStats(period);
+            return legacySuccess(toSnakeCase(stats as unknown as Record<string, unknown>));
+        }
+
+        if (pathname === DASHBOARD_PATHS.realtime && method === "GET") {
+            const metrics = await svc.getRealtimeMetrics();
+            return legacySuccess(metrics);
+        }
+
+        if (pathname === DASHBOARD_PATHS.trend && method === "GET") {
+            const trend = await svc.getUsageTrend(period, granularity);
+            return legacySuccess({ trend });
+        }
+
+        if (pathname === DASHBOARD_PATHS.models && method === "GET") {
+            const models = await svc.getModelStats(period);
+            return legacySuccess({ models });
+        }
+
+        if (pathname === DASHBOARD_PATHS.groups && method === "GET") {
+            const groups = await svc.getGroupStats(period);
+            return legacySuccess({ groups });
+        }
+
+        if (pathname === DASHBOARD_PATHS.apiKeysTrend && method === "POST") {
+            const body = await request.json() as Record<string, unknown>;
+            const apiKeyIds = Array.isArray(body.api_key_ids) ? body.api_key_ids.map(Number) : [];
+            const trends = await svc.getAPIKeyUsageTrend(apiKeyIds, period);
+            return legacySuccess({ trends });
+        }
+
+        if (pathname === DASHBOARD_PATHS.usersTrend && method === "POST") {
+            const body = await request.json() as Record<string, unknown>;
+            const userIds = Array.isArray(body.user_ids) ? body.user_ids.map(Number) : [];
+            const trends = await svc.getUserUsageTrend(userIds, period);
+            return legacySuccess({ trends });
+        }
+
+        if (pathname === DASHBOARD_PATHS.usersRanking && method === "GET") {
+            const limit = parseOptionalInt(url, "limit") ?? 50;
+            const ranking = await svc.getUserSpendingRanking(period, limit);
+            return legacySuccess({ ranking });
+        }
+
+        if (pathname === DASHBOARD_PATHS.usersUsage && method === "POST") {
+            const body = await request.json() as Record<string, unknown>;
+            const userIds = Array.isArray(body.user_ids) ? body.user_ids.map(Number) : [];
+            const usage = await svc.getBatchUsersUsage(userIds, period);
+            return legacySuccess({ usage });
+        }
+
+        if (pathname === DASHBOARD_PATHS.apiKeysUsage && method === "POST") {
+            const body = await request.json() as Record<string, unknown>;
+            const apiKeyIds = Array.isArray(body.api_key_ids) ? body.api_key_ids.map(Number) : [];
+            const usage = await svc.getBatchAPIKeysUsage(apiKeyIds, period);
+            return legacySuccess({ usage });
+        }
+
+        if (pathname === DASHBOARD_PATHS.userBreakdown && method === "GET") {
+            const userId = parseOptionalInt(url, "user_id");
+            if (userId === undefined) return legacyError(400, "user_id is required", "MISSING_USER_ID");
+            const breakdown = await svc.getUserBreakdown(userId, period);
+            return legacySuccess(toSnakeCase(breakdown as unknown as Record<string, unknown>));
+        }
+
+        if (pathname === DASHBOARD_PATHS.backfill && method === "POST") {
+            const body = await request.json() as Record<string, unknown>;
+            const from = typeof body.from === "string" ? body.from : "";
+            const to = typeof body.to === "string" ? body.to : "";
+            if (!from || !to) return legacyError(400, "from and to dates are required", "MISSING_DATES");
+            const result = await svc.backfillAggregation(from, to);
+            return legacySuccess(result);
+        }
+
+        return routerError(405, "method_not_allowed", "Method not allowed for this dashboard route");
+    } catch (error: unknown) {
+if (error instanceof AccessAuthError) return middlewareAuthError(401, error.code, error.message);
+        if (error instanceof DashboardError) return legacyError(error.status, error.message, error.code);
+        console.error("Dashboard error:", error);
+        return legacyInternalError();
+    }
+}
+
+function parseOptionalInt(url: URL, key: string): number | undefined {
+    const v = url.searchParams.get(key);
+    if (v === null || v.trim() === "") return undefined;
+    const n = Number.parseInt(v.trim(), 10);
+    return Number.isInteger(n) ? n : undefined;
+}
+
+import { DashboardError } from "../services/dashboard.ts";

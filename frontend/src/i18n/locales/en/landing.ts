@@ -192,34 +192,18 @@ export default {
   // Setup Wizard
   setup: {
     title: 'Sub2API Setup',
-    description: 'Configure your Sub2API instance',
-    database: {
-      title: 'Database Configuration',
-      description: 'Connect to your PostgreSQL database',
-      host: 'Host',
-      port: 'Port',
-      username: 'Username',
-      password: 'Password',
-      databaseName: 'Database Name',
-      sslMode: 'SSL Mode',
-      passwordPlaceholder: 'Password',
-      ssl: {
-        disable: 'Disable',
-        require: 'Require',
-        verifyCa: 'Verify CA',
-        verifyFull: 'Verify Full'
-      }
-    },
-    redis: {
-      title: 'Redis Configuration',
-      description: 'Connect to your Redis server',
-      host: 'Host',
-      port: 'Port',
-      password: 'Password (optional)',
-      database: 'Database',
-      passwordPlaceholder: 'Password',
-      enableTls: 'Enable TLS',
-      enableTlsHint: 'Use TLS when connecting to Redis (public CA certs)'
+    description: 'Initialize the Cloudflare Pages, Worker, and D1 deployment',
+    cloudflare: {
+      title: 'Cloudflare Environment',
+      description: 'Verify that the Worker can access its D1 database binding',
+      database: 'Cloudflare D1',
+      databaseDescription: 'Persistent application data and runtime state',
+      runtime: 'Pages + Worker',
+      runtimeDescription: 'Static frontend and edge API runtime',
+      ready: 'The D1 binding is ready and no administrator exists yet.',
+      checking: 'Checking D1 binding...',
+      retry: 'Check environment again',
+      bindingMissing: 'The Worker cannot access D1. Configure the DB binding before installation.'
     },
     admin: {
       title: 'Admin Account',
@@ -233,21 +217,16 @@ export default {
     },
     ready: {
       title: 'Ready to Install',
-      description: 'Review your configuration and complete setup',
-      database: 'Database',
-      redis: 'Redis',
+      description: 'Create the first administrator in Cloudflare D1',
+      platform: 'Runtime',
       adminEmail: 'Admin Email'
     },
     status: {
-      testing: 'Testing...',
-      success: 'Connection Successful',
-      testConnection: 'Test Connection',
       installing: 'Installing...',
       completeInstallation: 'Complete Installation',
       completed: 'Installation completed!',
       redirecting: 'Redirecting to login page...',
-      restarting: 'Service is restarting, please wait...',
-      timeout: 'Service restart is taking longer than expected. Please refresh the page manually.'
+      installFailed: 'Installation failed'
     }
   },
 
