@@ -9,7 +9,7 @@ crons = ["* * * * *"]
 
 [vars]
 EMAIL_TASK_BATCH_SIZE = "10"
-# CORS_ALLOWED_ORIGINS = "https://yourdomain.com"  # 逗号分隔多个来源，或 "*" 允许所有
+CORS_ALLOWED_ORIGINS = "https://sub.imjcj.eu.org"  # 逗号分隔多个来源，或 "*" 允许所有
 
 # Required secret. Configure it with:
 #   npx wrangler secret put EMAIL_TASK_ENCRYPTION_KEY
@@ -34,5 +34,5 @@ EMAIL_TASK_BATCH_SIZE = "10"
 [[d1_databases]]
 binding = "DB"
 database_name = "sub2api"
-database_id = "local-dev"  # wrangler dev 会自动使用本地 SQLite 模拟
+database_id = "799772a6-1239-4247-b92b-4c6a6b2b2ef2"  # wrangler dev 会自动使用本地 SQLite 模拟
 migrations_dir = "../d1/migrations"
