@@ -30,6 +30,7 @@
 
 Worker 已将认证、用户域、API Key、管理端 CRUD、订阅、公告、渠道、运营、OAuth 暂存流程和模型网关接入 D1；测试会显式覆盖这些模块。支付订单/管理接口、Stripe/Airwallex 支付意图和签名回调已有 D1 实现与安全测试。支付宝、微信支付和 EasyPay 的真实商户签名/预支付仍需要按供应商协议配置并完成对应回调适配，不能在未配置密钥时模拟“支付成功”。
 
+
 - 用户认证（邮箱 / OAuth / TOTP 2FA）
 - API Key 管理与配额分发
 - 多平台账号调度（OpenAI / Claude / Grok / Gemini / Antigravity）
