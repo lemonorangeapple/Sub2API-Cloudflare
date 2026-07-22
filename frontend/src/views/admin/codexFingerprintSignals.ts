@@ -6,6 +6,10 @@ export interface FingerprintSignalRow {
   required: boolean;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 const VALID_TYPES: FingerprintSignalType[] = [
   "header_exact",
   "header_prefix",
@@ -23,11 +27,13 @@ export function parseFingerprintSignalsToRows(raw: string | unknown[]): Fingerpr
     if (!Array.isArray(arr)) return [];
   }
   return arr.map((e) => ({
-    type: VALID_TYPES.includes(e?.type) ? e.type : "header_exact",
-    match: Array.isArray(e?.match)
+    type: isRecord(e) && VALID_TYPES.includes(e.type as FingerprintSignalType)
+      ? (e.type as FingerprintSignalType)
+      : "header_exact",
+    match: isRecord(e) && Array.isArray(e.match)
       ? e.match.filter((x: unknown) => typeof x === "string").join(" / ")
       : "",
-    required: e?.required === true,
+    required: isRecord(e) && e.required === true,
   }));
 }
 

@@ -8966,6 +8966,11 @@ interface CodexClientRow {
   uaContains: string; // 逗号分隔，序列化时拆成 ua_contains 数组
   skipEngineFingerprint?: boolean; // 仅白名单：命中即跳过引擎指纹门
 }
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 const codexBlacklistRows = ref<CodexClientRow[]>([]);
 const codexWhitelistRows = ref<CodexClientRow[]>([]);
 const codexFingerprintRows = ref<FingerprintSignalRow[]>([]);
@@ -8990,13 +8995,14 @@ function parseCodexEntriesToRows(raw: string | unknown[]): CodexClientRow[] {
     if (!Array.isArray(arr)) return [];
   }
   return arr.map((e) => ({
-    originator: typeof e?.originator === "string" ? e.originator : "",
-    uaContains: Array.isArray(e?.ua_contains)
-      ? e.ua_contains
-          .filter((x: unknown) => typeof x === "string")
-          .join(", ")
-      : "",
-    skipEngineFingerprint: e?.skip_engine_fingerprint === true,
+    originator: isRecord(e) && typeof e.originator === "string" ? e.originator : "",
+    uaContains:
+      isRecord(e) && Array.isArray(e.ua_contains)
+        ? e.ua_contains
+            .filter((x: unknown) => typeof x === "string")
+            .join(", ")
+        : "",
+    skipEngineFingerprint: isRecord(e) && e.skip_engine_fingerprint === true,
   }));
 }
 
