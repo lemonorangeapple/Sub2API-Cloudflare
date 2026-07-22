@@ -95,10 +95,15 @@ export interface APIKeyUsageTrend {
     trend: UsageTrendPoint[];
 }
 
-export interface UserUsageTrend {
+export interface UserUsageTrendPoint {
+    date: string;
     userId: number;
+    email: string;
     username: string;
-    trend: UsageTrendPoint[];
+    requests: number;
+    tokens: number;
+    cost: number;
+    actualCost: number;
 }
 
 export interface UserSpendingRanking {
@@ -137,7 +142,7 @@ export interface D1DashboardRepository {
     getModelStats(period: string): Promise<ModelStats[]>;
     getGroupStats(period: string): Promise<GroupStats[]>;
     getAPIKeyUsageTrend(apiKeyIds: number[], period: string): Promise<APIKeyUsageTrend[]>;
-    getUserUsageTrend(userIds: number[], period: string): Promise<UserUsageTrend[]>;
+    getUserUsageTrend(startDate: string, endDate: string, granularity: string, limit: number): Promise<UserUsageTrendPoint[]>;
     getUserSpendingRanking(period: string, limit: number): Promise<UserSpendingRanking[]>;
     getBatchUsersUsage(userIds: number[], period: string): Promise<BatchUsageResult[]>;
     getBatchAPIKeysUsage(apiKeyIds: number[], period: string): Promise<BatchUsageResult[]>;
@@ -423,43 +428,58 @@ export class D1DashboardRepositoryImpl implements D1DashboardRepository {
         }));
     }
 
-    async getUserUsageTrend(userIds: number[], period: string): Promise<UserUsageTrend[]> {
-        if (userIds.length === 0) return [];
-        const { start, end } = this.parsePeriod(period);
-        const placeholders = userIds.map(() => "?").join(",");
+    async getUserUsageTrend(startDate: string, endDate: string, granularity: string, limit: number): Promise<UserUsageTrendPoint[]> {
+        const start = new Date(`${startDate}T00:00:00.000Z`).toISOString();
+        const end = new Date(new Date(`${endDate}T00:00:00.000Z`).getTime() + 24 * 60 * 60 * 1000).toISOString();
+        const bucketExpr = granularity === "hour"
+            ? "strftime('%Y-%m-%dT%H:00:00Z', u.created_at)"
+            : "strftime('%Y-%m-%d', u.created_at)";
+
         const rows = await allRows<{
-            user_id: number; bucket_start: string; total_requests: number; total_cost: number;
-            input_tokens: number; output_tokens: number; total_duration_ms: number;
+            date: string;
+            user_id: number;
+            email: string;
+            username: string;
+            requests: number;
+            tokens: number;
+            cost: number;
+            actual_cost: number;
         }>(this.#db,
-            `SELECT user_id, bucket_start, total_requests, total_cost, input_tokens, output_tokens, total_duration_ms
-             FROM usage_dashboard_hourly_users
-             WHERE bucket_start >= ? AND bucket_start <= ? AND user_id IN (${placeholders})
-             ORDER BY user_id, bucket_start`,
-            [start, end, ...userIds]
+            `WITH top_users AS (
+                 SELECT user_id
+                 FROM usage_logs
+                 WHERE created_at >= ? AND created_at < ?
+                 GROUP BY user_id
+                 ORDER BY SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens) DESC
+                 LIMIT ?
+             )
+             SELECT
+                 ${bucketExpr} as date,
+                 u.user_id,
+                 COALESCE(us.email, '') as email,
+                 COALESCE(us.username, '') as username,
+                 COUNT(*) as requests,
+                 COALESCE(SUM(u.input_tokens + u.output_tokens + u.cache_creation_tokens + u.cache_read_tokens), 0) as tokens,
+                 COALESCE(SUM(u.total_cost), 0) as cost,
+                 COALESCE(SUM(u.actual_cost), 0) as actual_cost
+             FROM usage_logs u
+             LEFT JOIN users us ON u.user_id = us.id
+             WHERE u.user_id IN (SELECT user_id FROM top_users)
+               AND u.created_at >= ? AND u.created_at < ?
+             GROUP BY date, u.user_id, us.email, us.username
+             ORDER BY date ASC, tokens DESC, u.user_id ASC`,
+            [start, end, limit, start, end]
         );
-        const byUser = new Map<number, UsageTrendPoint[]>();
-        for (const r of rows) {
-            const arr = byUser.get(r.user_id) ?? [];
-            arr.push({
-                bucket: r.bucket_start,
-                requests: r.total_requests,
-                inputTokens: r.input_tokens,
-                outputTokens: r.output_tokens,
-                cacheCreationTokens: 0,
-                cacheReadTokens: 0,
-                totalCost: r.total_cost,
-                actualCost: 0,
-                avgLatencyMs: r.total_requests > 0 ? r.total_duration_ms / r.total_requests : 0,
-                errorRate: 0,
-                activeUsers: 0,
-            });
-            byUser.set(r.user_id, arr);
-        }
-        const userNames = await this.getUserNames(userIds);
-        return Array.from(byUser.entries()).map(([userId, trend]) => ({
-            userId,
-            username: userNames.get(userId) ?? `user_${userId}`,
-            trend,
+
+        return rows.map((r) => ({
+            date: r.date,
+            userId: r.user_id,
+            email: r.email,
+            username: r.username,
+            requests: r.requests,
+            tokens: r.tokens,
+            cost: r.cost,
+            actualCost: r.actual_cost,
         }));
     }
 

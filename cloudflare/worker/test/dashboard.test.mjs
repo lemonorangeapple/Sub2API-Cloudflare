@@ -98,15 +98,14 @@ test("admin dashboard", async (t) => {
         assert.ok(Array.isArray(j.data.trends));
     });
 
-    await t.test("POST /dashboard/users-trend returns trends", async () => {
+    await t.test("GET /dashboard/users-trend returns trends", async () => {
         const d = db(); const aid = await insAdmin(d); const tk = await token(d, aid, "admin@x.com", "admin");
-        const r = await routeRequest(new Request(`${BASE}${P}/users-trend`, {
-            method: "POST", headers: { authorization: `Bearer ${tk}`, "content-type": "application/json" },
-            body: JSON.stringify({ user_ids: [] })
+        const r = await routeRequest(new Request(`${BASE}${P}/users-trend?start_date=2026-07-21&end_date=2026-07-22&granularity=hour&limit=12`, {
+            headers: { authorization: `Bearer ${tk}` }
         }), env(d));
         const j = await r.json();
         assert.equal(r.status, 200);
-        assert.ok(Array.isArray(j.data.trends));
+        assert.ok(Array.isArray(j.data.trend));
     });
 
     await t.test("GET /dashboard/users-ranking returns ranking", async () => {

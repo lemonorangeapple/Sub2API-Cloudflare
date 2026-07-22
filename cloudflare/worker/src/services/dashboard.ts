@@ -47,8 +47,8 @@ export class D1DashboardService {
         return this.#repo.getAPIKeyUsageTrend(apiKeyIds, period);
     }
 
-    async getUserUsageTrend(userIds: number[], period: string): Promise<ReturnType<D1DashboardRepository["getUserUsageTrend"]>> {
-        return this.#repo.getUserUsageTrend(userIds, period);
+    async getUserUsageTrend(startDate: string, endDate: string, granularity: string, limit: number): Promise<ReturnType<D1DashboardRepository["getUserUsageTrend"]>> {
+        return this.#repo.getUserUsageTrend(startDate, endDate, granularity, limit);
     }
 
     async getUserSpendingRanking(period: string, limit: number): Promise<ReturnType<D1DashboardRepository["getUserSpendingRanking"]>> {

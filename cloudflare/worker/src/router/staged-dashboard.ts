@@ -136,11 +136,19 @@ export async function routeStagedDashboard(
             return legacySuccess({ trends });
         }
 
-        if (pathname === DASHBOARD_PATHS.usersTrend && method === "POST") {
-            const body = await request.json() as Record<string, unknown>;
-            const userIds = Array.isArray(body.user_ids) ? body.user_ids.map(Number) : [];
-            const trends = await svc.getUserUsageTrend(userIds, period);
-            return legacySuccess({ trends });
+        if (pathname === DASHBOARD_PATHS.usersTrend && method === "GET") {
+            const startDate = url.searchParams.get("start_date") ?? "";
+            const endDate = url.searchParams.get("end_date") ?? "";
+            const granularityParam = url.searchParams.get("granularity") ?? "day";
+            const limit = parseOptionalInt(url, "limit") ?? 12;
+            const granularity = granularityParam === "hour" ? "hour" : "day";
+            const trends = await svc.getUserUsageTrend(startDate, endDate, granularity, limit);
+            return legacySuccess({
+                trend: trends,
+                start_date: startDate,
+                end_date: endDate,
+                granularity,
+            });
         }
 
         if (pathname === DASHBOARD_PATHS.usersRanking && method === "GET") {
