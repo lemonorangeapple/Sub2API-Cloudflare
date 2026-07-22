@@ -176,28 +176,28 @@ export async function routeRequest(request: Request, env: Env): Promise<Response
     }
 
     if (url.pathname === "/health" && (request.method === "GET" || request.method === "HEAD")) {
-        return healthResponse(request.method);
+        return addCORSHeaders(healthResponse(request.method), request, env);
     }
 
     const publicSettingsResponse = await routePublicSettings(request, env);
     if (publicSettingsResponse !== null) {
-        return publicSettingsResponse;
+        return addCORSHeaders(publicSettingsResponse, request, env);
     }
 
     const setupStatusResponse = await routeSetupStatus(request, env);
     if (setupStatusResponse !== null) {
-        return setupStatusResponse;
+        return addCORSHeaders(setupStatusResponse, request, env);
     }
 
     if (request.headers.has(PROXY_HOP_HEADER)) {
-        return routerError(508, "proxy_loop_detected", "The request has already passed through this router");
+        return addCORSHeaders(routerError(508, "proxy_loop_detected", "The request has already passed through this router"), request, env);
     }
 
     const gatewayResponse = await routeGateway(request, env);
-    if (gatewayResponse !== null) return gatewayResponse;
+    if (gatewayResponse !== null) return addCORSHeaders(gatewayResponse, request, env);
 
     const paymentWebhookResponse = await routeStagedPaymentWebhook(request, env);
-    if (paymentWebhookResponse !== null) return paymentWebhookResponse;
+    if (paymentWebhookResponse !== null) return addCORSHeaders(paymentWebhookResponse, request, env);
 
     // D1-native staged routes: authentication, security, user domain, OAuth providers
     const stagedResponse = await routeStagedAuth(request, env)
