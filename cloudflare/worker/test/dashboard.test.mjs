@@ -43,8 +43,10 @@ test("admin dashboard", async (t) => {
         const r = await routeRequest(new Request(`${BASE}${P}/snapshot-v2?period=day`, { headers: { authorization: `Bearer ${tk}` } }), env(d));
         const j = await r.json();
         assert.equal(r.status, 200);
-        assert.equal(typeof j.data.total_requests, "number");
-        assert.equal(typeof j.data.total_cost, "number");
+        assert.equal(typeof j.data.stats.total_requests, "number");
+        assert.equal(typeof j.data.stats.total_cost, "number");
+        assert.ok(Array.isArray(j.data.trend));
+        assert.ok(Array.isArray(j.data.models));
     });
 
     await t.test("GET /dashboard/stats returns stats", async () => {

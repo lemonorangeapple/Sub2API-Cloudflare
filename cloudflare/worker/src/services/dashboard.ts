@@ -19,28 +19,24 @@ export class D1DashboardService {
         this.#repo = repo;
     }
 
-    async getSnapshotV2(period: string): Promise<ReturnType<D1DashboardRepository["getSnapshotV2"]>> {
-        return this.#repo.getSnapshotV2(period);
-    }
-
-    async getStats(period: string): Promise<ReturnType<D1DashboardRepository["getStats"]>> {
-        return this.#repo.getStats(period);
+    async getStats(period: string, startDate?: string, endDate?: string): Promise<ReturnType<D1DashboardRepository["getStats"]>> {
+        return this.#repo.getStats(period, startDate, endDate);
     }
 
     async getRealtimeMetrics(): Promise<ReturnType<D1DashboardRepository["getRealtimeMetrics"]>> {
         return this.#repo.getRealtimeMetrics();
     }
 
-    async getUsageTrend(period: string, granularity: string): Promise<ReturnType<D1DashboardRepository["getUsageTrend"]>> {
-        return this.#repo.getUsageTrend(period, granularity);
+    async getUsageTrend(period: string, granularity: string, startDate?: string, endDate?: string): Promise<ReturnType<D1DashboardRepository["getUsageTrend"]>> {
+        return this.#repo.getUsageTrend(period, granularity, startDate, endDate);
     }
 
-    async getModelStats(period: string): Promise<ReturnType<D1DashboardRepository["getModelStats"]>> {
-        return this.#repo.getModelStats(period);
+    async getModelStats(period: string, startDate?: string, endDate?: string): Promise<ReturnType<D1DashboardRepository["getModelStats"]>> {
+        return this.#repo.getModelStats(period, startDate, endDate);
     }
 
-    async getGroupStats(period: string): Promise<ReturnType<D1DashboardRepository["getGroupStats"]>> {
-        return this.#repo.getGroupStats(period);
+    async getGroupStats(period: string, startDate?: string, endDate?: string): Promise<ReturnType<D1DashboardRepository["getGroupStats"]>> {
+        return this.#repo.getGroupStats(period, startDate, endDate);
     }
 
     async getAPIKeyUsageTrend(apiKeyIds: number[], period: string): Promise<ReturnType<D1DashboardRepository["getAPIKeyUsageTrend"]>> {
@@ -51,8 +47,8 @@ export class D1DashboardService {
         return this.#repo.getUserUsageTrend(startDate, endDate, granularity, limit);
     }
 
-    async getUserSpendingRanking(period: string, limit: number): Promise<ReturnType<D1DashboardRepository["getUserSpendingRanking"]>> {
-        return this.#repo.getUserSpendingRanking(period, limit);
+    async getUserSpendingRanking(period: string, limit: number, startDate?: string, endDate?: string): Promise<ReturnType<D1DashboardRepository["getUserSpendingRanking"]>> {
+        return this.#repo.getUserSpendingRanking(period, limit, startDate, endDate);
     }
 
     async getBatchUsersUsage(userIds: number[], period: string): Promise<ReturnType<D1DashboardRepository["getBatchUsersUsage"]>> {

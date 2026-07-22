@@ -98,10 +98,32 @@ export async function routeStagedDashboard(
 
         const period = url.searchParams.get("period") ?? "day";
         const granularity = url.searchParams.get("granularity") ?? "day";
+        const startDate = url.searchParams.get("start_date") ?? undefined;
+        const endDate = url.searchParams.get("end_date") ?? undefined;
+        const includeStats = url.searchParams.get("include_stats") !== "false";
+        const includeTrend = url.searchParams.get("include_trend") !== "false";
+        const includeModelStats = url.searchParams.get("include_model_stats") !== "false";
 
         if (pathname === DASHBOARD_PATHS.snapshotV2 && method === "GET") {
-            const snapshot = await svc.getSnapshotV2(period);
-            return legacySuccess(toSnakeCase(snapshot as unknown as Record<string, unknown>));
+            const response: Record<string, unknown> = {
+                generated_at: new Date().toISOString(),
+                start_date: startDate ?? "",
+                end_date: endDate ?? "",
+                granularity,
+            };
+            if (includeStats) {
+                const stats = await svc.getStats(period, startDate, endDate);
+                response.stats = { ...toSnakeCase(stats as unknown as Record<string, unknown>), uptime: 0 };
+            }
+            if (includeTrend) {
+                const trend = await svc.getUsageTrend(period, granularity, startDate, endDate);
+                response.trend = trend.map((t) => toSnakeCase(t as unknown as Record<string, unknown>));
+            }
+            if (includeModelStats) {
+                const models = await svc.getModelStats(period, startDate, endDate);
+                response.models = models.map((m) => toSnakeCase(m as unknown as Record<string, unknown>));
+            }
+            return legacySuccess(response);
         }
 
         if (pathname === DASHBOARD_PATHS.stats && method === "GET") {
@@ -152,8 +174,10 @@ export async function routeStagedDashboard(
         }
 
         if (pathname === DASHBOARD_PATHS.usersRanking && method === "GET") {
-            const limit = parseOptionalInt(url, "limit") ?? 50;
-            const ranking = await svc.getUserSpendingRanking(period, limit);
+            const rankingLimit = parseOptionalInt(url, "limit") ?? 50;
+            const rankingStartDate = url.searchParams.get("start_date") ?? undefined;
+            const rankingEndDate = url.searchParams.get("end_date") ?? undefined;
+            const ranking = await svc.getUserSpendingRanking(period, rankingLimit, rankingStartDate, rankingEndDate);
             return legacySuccess({ ranking });
         }
 

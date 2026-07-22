@@ -135,15 +135,14 @@ export interface UserBreakdown {
 }
 
 export interface D1DashboardRepository {
-    getSnapshotV2(period: string): Promise<DashboardSnapshot>;
-    getStats(period: string): Promise<DashboardStats>;
+    getStats(period: string, startDate?: string, endDate?: string): Promise<DashboardStats>;
     getRealtimeMetrics(): Promise<RealtimeMetrics>;
-    getUsageTrend(period: string, granularity: string): Promise<UsageTrendPoint[]>;
-    getModelStats(period: string): Promise<ModelStats[]>;
-    getGroupStats(period: string): Promise<GroupStats[]>;
+    getUsageTrend(period: string, granularity: string, startDate?: string, endDate?: string): Promise<UsageTrendPoint[]>;
+    getModelStats(period: string, startDate?: string, endDate?: string): Promise<ModelStats[]>;
+    getGroupStats(period: string, startDate?: string, endDate?: string): Promise<GroupStats[]>;
     getAPIKeyUsageTrend(apiKeyIds: number[], period: string): Promise<APIKeyUsageTrend[]>;
     getUserUsageTrend(startDate: string, endDate: string, granularity: string, limit: number): Promise<UserUsageTrendPoint[]>;
-    getUserSpendingRanking(period: string, limit: number): Promise<UserSpendingRanking[]>;
+    getUserSpendingRanking(period: string, limit: number, startDate?: string, endDate?: string): Promise<UserSpendingRanking[]>;
     getBatchUsersUsage(userIds: number[], period: string): Promise<BatchUsageResult[]>;
     getBatchAPIKeysUsage(apiKeyIds: number[], period: string): Promise<BatchUsageResult[]>;
     getUserBreakdown(userId: number, period: string): Promise<UserBreakdown>;
@@ -183,6 +182,15 @@ export class D1DashboardRepositoryImpl implements D1DashboardRepository {
                 start = new Date(now.getTime() - 24 * 60 * 60 * 1000);
         }
         return { start: start.toISOString(), end: now.toISOString() };
+    }
+
+    private resolveDateRange(startDate?: string, endDate?: string, fallbackPeriod?: string): { start: string; end: string } {
+        if (startDate && endDate) {
+            const start = new Date(`${startDate}T00:00:00.000Z`);
+            const endMs = new Date(`${endDate}T00:00:00.000Z`).getTime() + 24 * 60 * 60 * 1000;
+            return { start: start.toISOString(), end: new Date(endMs).toISOString() };
+        }
+        return this.parsePeriod(fallbackPeriod ?? "day");
     }
 
     async getSnapshotV2(period: string): Promise<DashboardSnapshot> {
@@ -226,8 +234,8 @@ export class D1DashboardRepositoryImpl implements D1DashboardRepository {
         };
     }
 
-    async getStats(period: string): Promise<DashboardStats> {
-        const { start, end } = this.parsePeriod(period);
+    async getStats(period: string, startDate?: string, endDate?: string): Promise<DashboardStats> {
+        const { start, end } = this.resolveDateRange(startDate, endDate, period);
         const hourly = await this.getHourlyAggregation(start, end);
         const daily = await this.getDailyAggregation(start, end);
 
@@ -278,8 +286,8 @@ export class D1DashboardRepositoryImpl implements D1DashboardRepository {
         };
     }
 
-    async getUsageTrend(period: string, granularity: string): Promise<UsageTrendPoint[]> {
-        const { start, end } = this.parsePeriod(period);
+    async getUsageTrend(period: string, granularity: string, startDate?: string, endDate?: string): Promise<UsageTrendPoint[]> {
+        const { start, end } = this.resolveDateRange(startDate, endDate, period);
         const isHourly = granularity === "hour";
 
         if (isHourly) {
@@ -323,8 +331,8 @@ export class D1DashboardRepositoryImpl implements D1DashboardRepository {
         }
     }
 
-    async getModelStats(period: string): Promise<ModelStats[]> {
-        const { start, end } = this.parsePeriod(period);
+    async getModelStats(period: string, startDate?: string, endDate?: string): Promise<ModelStats[]> {
+        const { start, end } = this.resolveDateRange(startDate, endDate, period);
         const rows = await allRows<{
             model: string; total_requests: number; input_tokens: number; output_tokens: number;
             cache_creation_tokens: number; cache_read_tokens: number; total_cost: number; actual_cost: number;
@@ -360,8 +368,8 @@ export class D1DashboardRepositoryImpl implements D1DashboardRepository {
         }));
     }
 
-    async getGroupStats(period: string): Promise<GroupStats[]> {
-        const { start, end } = this.parsePeriod(period);
+    async getGroupStats(period: string, startDate?: string, endDate?: string): Promise<GroupStats[]> {
+        const { start, end } = this.resolveDateRange(startDate, endDate, period);
         const rows = await allRows<{
             group_id: number; group_name: string; total_requests: number; total_cost: number;
             active_users: number; active_api_keys: number;
@@ -483,8 +491,8 @@ export class D1DashboardRepositoryImpl implements D1DashboardRepository {
         }));
     }
 
-    async getUserSpendingRanking(period: string, limit: number): Promise<UserSpendingRanking[]> {
-        const { start, end } = this.parsePeriod(period);
+    async getUserSpendingRanking(period: string, limit: number, startDate?: string, endDate?: string): Promise<UserSpendingRanking[]> {
+        const { start, end } = this.resolveDateRange(startDate, endDate, period);
         const rows = await allRows<{
             user_id: number; username: string; email: string; total_cost: number; total_requests: number; total_tokens: number;
         }>(this.#db,
