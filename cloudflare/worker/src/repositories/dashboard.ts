@@ -20,11 +20,40 @@ export interface DashboardSnapshot {
 }
 
 export interface DashboardStats {
+    totalUsers: number;
+    todayNewUsers: number;
+    hourlyActiveUsers: number;
+    statsUpdatedAt: string;
+    totalAPIKeys: number;
+    activeAPIKeys: number;
+    totalAccounts: number;
+    normalAccounts: number;
+    errorAccounts: number;
+    ratelimitAccounts: number;
+    overloadAccounts: number;
     totalRequests: number;
+    totalInputTokens: number;
+    totalOutputTokens: number;
+    totalCacheCreationTokens: number;
+    totalCacheReadTokens: number;
     totalTokens: number;
     totalCost: number;
+    totalActualCost: number;
+    totalAccountCost: number;
+    todayRequests: number;
+    todayInputTokens: number;
+    todayOutputTokens: number;
+    todayCacheCreationTokens: number;
+    todayCacheReadTokens: number;
+    todayTokens: number;
+    todayCost: number;
+    todayActualCost: number;
+    todayAccountCost: number;
+    averageDurationMs: number;
+    uptime: number;
+    rpm: number;
+    tpm: number;
     activeUsers: number;
-    activeAPIKeys: number;
     activeAccounts: number;
     errorRate: number;
     avgLatencyMs: number;
@@ -111,6 +140,7 @@ export interface UserSpendingRanking {
     username: string;
     email: string;
     totalCost: number;
+    actualCost: number;
     totalRequests: number;
     totalTokens: number;
 }
@@ -236,25 +266,124 @@ export class D1DashboardRepositoryImpl implements D1DashboardRepository {
 
     async getStats(period: string, startDate?: string, endDate?: string): Promise<DashboardStats> {
         const { start, end } = this.resolveDateRange(startDate, endDate, period);
-        const hourly = await this.getHourlyAggregation(start, end);
-        const daily = await this.getDailyAggregation(start, end);
+        const usage = await firstRow<{
+            total_requests: number;
+            input_tokens: number;
+            output_tokens: number;
+            cache_creation_tokens: number;
+            cache_read_tokens: number;
+            total_cost: number;
+            actual_cost: number;
+            account_cost: number;
+            total_duration_ms: number;
+        }>(this.#db, `SELECT
+                COUNT(*) as total_requests,
+                COALESCE(SUM(input_tokens), 0) as input_tokens,
+                COALESCE(SUM(output_tokens), 0) as output_tokens,
+                COALESCE(SUM(cache_creation_tokens), 0) as cache_creation_tokens,
+                COALESCE(SUM(cache_read_tokens), 0) as cache_read_tokens,
+                COALESCE(SUM(total_cost), 0) as total_cost,
+                COALESCE(SUM(actual_cost), 0) as actual_cost,
+                COALESCE(SUM(COALESCE(account_stats_cost, total_cost)), 0) as account_cost,
+                COALESCE(SUM(duration_ms), 0) as total_duration_ms
+             FROM usage_logs
+             WHERE created_at >= ? AND created_at < ?`, [start, end]);
 
-        const totalRequests = hourly.reduce((sum, h) => sum + h.total_requests, 0) +
-            daily.reduce((sum, d) => sum + d.total_requests, 0);
-        const totalTokens = hourly.reduce((sum, h) => sum + h.input_tokens + h.output_tokens + h.cache_creation_tokens + h.cache_read_tokens, 0) +
-            daily.reduce((sum, d) => sum + d.input_tokens + d.output_tokens + d.cache_creation_tokens + d.cache_read_tokens, 0);
-        const totalCost = hourly.reduce((sum, h) => sum + h.total_cost, 0) +
-            daily.reduce((sum, d) => sum + d.total_cost, 0);
-        const totalDuration = hourly.reduce((sum, h) => sum + h.total_duration_ms, 0) +
-            daily.reduce((sum, d) => sum + d.total_duration_ms, 0);
+        const todayStart = new Date();
+        todayStart.setUTCHours(0, 0, 0, 0);
+        const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+        const today = await firstRow<{
+            requests: number;
+            input_tokens: number;
+            output_tokens: number;
+            cache_creation_tokens: number;
+            cache_read_tokens: number;
+            cost: number;
+            actual_cost: number;
+            account_cost: number;
+        }>(this.#db, `SELECT
+                COUNT(*) as requests,
+                COALESCE(SUM(input_tokens), 0) as input_tokens,
+                COALESCE(SUM(output_tokens), 0) as output_tokens,
+                COALESCE(SUM(cache_creation_tokens), 0) as cache_creation_tokens,
+                COALESCE(SUM(cache_read_tokens), 0) as cache_read_tokens,
+                COALESCE(SUM(total_cost), 0) as cost,
+                COALESCE(SUM(actual_cost), 0) as actual_cost,
+                COALESCE(SUM(COALESCE(account_stats_cost, total_cost)), 0) as account_cost
+             FROM usage_logs
+             WHERE created_at >= ? AND created_at < ?`, [todayStart.toISOString(), todayEnd.toISOString()]);
+
+        const entities = await firstRow<{
+            total_users: number;
+            today_new_users: number;
+            total_api_keys: number;
+            active_api_keys: number;
+            total_accounts: number;
+            normal_accounts: number;
+            error_accounts: number;
+            ratelimit_accounts: number;
+            overload_accounts: number;
+        }>(this.#db, `SELECT
+                (SELECT COUNT(*) FROM users WHERE deleted_at IS NULL) as total_users,
+                (SELECT COUNT(*) FROM users WHERE deleted_at IS NULL AND created_at >= ?) as today_new_users,
+                (SELECT COUNT(*) FROM api_keys WHERE deleted_at IS NULL) as total_api_keys,
+                (SELECT COUNT(*) FROM api_keys WHERE deleted_at IS NULL AND status = 'active') as active_api_keys,
+                (SELECT COUNT(*) FROM accounts WHERE deleted_at IS NULL) as total_accounts,
+                (SELECT COUNT(*) FROM accounts WHERE deleted_at IS NULL AND status = 'active' AND schedulable = 1) as normal_accounts,
+                (SELECT COUNT(*) FROM accounts WHERE deleted_at IS NULL AND status = 'error') as error_accounts,
+                (SELECT COUNT(*) FROM accounts WHERE deleted_at IS NULL AND rate_limited_at IS NOT NULL AND rate_limit_reset_at > ?) as ratelimit_accounts,
+                (SELECT COUNT(*) FROM accounts WHERE deleted_at IS NULL AND overload_until IS NOT NULL AND overload_until > ?) as overload_accounts`,
+            [todayStart.toISOString(), new Date().toISOString(), new Date().toISOString()]);
+
+        const totalRequests = usage?.total_requests ?? 0;
+        const totalInputTokens = usage?.input_tokens ?? 0;
+        const totalOutputTokens = usage?.output_tokens ?? 0;
+        const totalCacheCreationTokens = usage?.cache_creation_tokens ?? 0;
+        const totalCacheReadTokens = usage?.cache_read_tokens ?? 0;
+        const totalTokens = totalInputTokens + totalOutputTokens + totalCacheCreationTokens + totalCacheReadTokens;
+        const totalDuration = usage?.total_duration_ms ?? 0;
+        const todayInputTokens = today?.input_tokens ?? 0;
+        const todayOutputTokens = today?.output_tokens ?? 0;
+        const todayCacheCreationTokens = today?.cache_creation_tokens ?? 0;
+        const todayCacheReadTokens = today?.cache_read_tokens ?? 0;
+        const todayTokens = todayInputTokens + todayOutputTokens + todayCacheCreationTokens + todayCacheReadTokens;
         const errorLogs = await this.getErrorCount(start, end);
 
         return {
+            totalUsers: entities?.total_users ?? 0,
+            todayNewUsers: entities?.today_new_users ?? 0,
+            hourlyActiveUsers: await this.getActiveUsersCount(new Date(Math.floor(Date.now() / 3600000) * 3600000).toISOString(), new Date().toISOString()),
+            statsUpdatedAt: new Date().toISOString(),
+            totalAPIKeys: entities?.total_api_keys ?? 0,
+            activeAPIKeys: entities?.active_api_keys ?? 0,
+            totalAccounts: entities?.total_accounts ?? 0,
+            normalAccounts: entities?.normal_accounts ?? 0,
+            errorAccounts: entities?.error_accounts ?? 0,
+            ratelimitAccounts: entities?.ratelimit_accounts ?? 0,
+            overloadAccounts: entities?.overload_accounts ?? 0,
             totalRequests,
+            totalInputTokens,
+            totalOutputTokens,
+            totalCacheCreationTokens,
+            totalCacheReadTokens,
             totalTokens,
-            totalCost,
+            totalCost: usage?.total_cost ?? 0,
+            totalActualCost: usage?.actual_cost ?? 0,
+            totalAccountCost: usage?.account_cost ?? 0,
+            todayRequests: today?.requests ?? 0,
+            todayInputTokens,
+            todayOutputTokens,
+            todayCacheCreationTokens,
+            todayCacheReadTokens,
+            todayTokens,
+            todayCost: today?.cost ?? 0,
+            todayActualCost: today?.actual_cost ?? 0,
+            todayAccountCost: today?.account_cost ?? 0,
+            averageDurationMs: totalRequests > 0 ? totalDuration / totalRequests : 0,
+            uptime: 0,
+            rpm: 0,
+            tpm: 0,
             activeUsers: await this.getActiveUsersCount(start, end),
-            activeAPIKeys: await this.getActiveAPIKeysCount(start, end),
             activeAccounts: await this.getActiveAccountsCount(start, end),
             errorRate: totalRequests > 0 ? errorLogs / totalRequests : 0,
             avgLatencyMs: totalRequests > 0 ? totalDuration / totalRequests : 0,
@@ -494,10 +623,11 @@ export class D1DashboardRepositoryImpl implements D1DashboardRepository {
     async getUserSpendingRanking(period: string, limit: number, startDate?: string, endDate?: string): Promise<UserSpendingRanking[]> {
         const { start, end } = this.resolveDateRange(startDate, endDate, period);
         const rows = await allRows<{
-            user_id: number; username: string; email: string; total_cost: number; total_requests: number; total_tokens: number;
+            user_id: number; username: string; email: string; total_cost: number; actual_cost: number; total_requests: number; total_tokens: number;
         }>(this.#db,
             `SELECT u.id as user_id, u.username, u.email,
                     COALESCE(SUM(ul.total_cost), 0) as total_cost,
+                    COALESCE(SUM(ul.actual_cost), 0) as actual_cost,
                     COUNT(ul.id) as total_requests,
                     COALESCE(SUM(ul.input_tokens + ul.output_tokens + ul.cache_creation_tokens + ul.cache_read_tokens), 0) as total_tokens
              FROM users u
@@ -513,6 +643,7 @@ export class D1DashboardRepositoryImpl implements D1DashboardRepository {
             username: r.username,
             email: r.email,
             totalCost: r.total_cost,
+            actualCost: r.actual_cost,
             totalRequests: r.total_requests,
             totalTokens: r.total_tokens,
         }));

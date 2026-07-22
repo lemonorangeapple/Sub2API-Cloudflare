@@ -29,6 +29,54 @@ function toSnakeCase(obj: Record<string, unknown>): Record<string, unknown> {
     return result;
 }
 
+function dashboardTrendPoint(point: {
+    bucket: string;
+    requests: number;
+    inputTokens: number;
+    outputTokens: number;
+    cacheCreationTokens: number;
+    cacheReadTokens: number;
+    totalCost: number;
+    actualCost: number;
+}): Record<string, unknown> {
+    return {
+        date: point.bucket,
+        requests: point.requests ?? 0,
+        input_tokens: point.inputTokens ?? 0,
+        output_tokens: point.outputTokens ?? 0,
+        cache_creation_tokens: point.cacheCreationTokens ?? 0,
+        cache_read_tokens: point.cacheReadTokens ?? 0,
+        total_tokens: (point.inputTokens ?? 0) + (point.outputTokens ?? 0) +
+            (point.cacheCreationTokens ?? 0) + (point.cacheReadTokens ?? 0),
+        cost: point.totalCost ?? 0,
+        actual_cost: point.actualCost ?? 0,
+    };
+}
+
+function dashboardModelStat(model: {
+    model: string;
+    requests: number;
+    inputTokens: number;
+    outputTokens: number;
+    cacheCreationTokens: number;
+    cacheReadTokens: number;
+    totalCost: number;
+    actualCost: number;
+}): Record<string, unknown> {
+    return {
+        model: model.model,
+        requests: model.requests ?? 0,
+        input_tokens: model.inputTokens ?? 0,
+        output_tokens: model.outputTokens ?? 0,
+        cache_creation_tokens: model.cacheCreationTokens ?? 0,
+        cache_read_tokens: model.cacheReadTokens ?? 0,
+        total_tokens: (model.inputTokens ?? 0) + (model.outputTokens ?? 0) +
+            (model.cacheCreationTokens ?? 0) + (model.cacheReadTokens ?? 0),
+        cost: model.totalCost ?? 0,
+        actual_cost: model.actualCost ?? 0,
+    };
+}
+
 const DASHBOARD_PATHS = {
     snapshotV2: "/api/v1/admin/dashboard/snapshot-v2",
     stats: "/api/v1/admin/dashboard/stats",
@@ -117,11 +165,11 @@ export async function routeStagedDashboard(
             }
             if (includeTrend) {
                 const trend = await svc.getUsageTrend(period, granularity, startDate, endDate);
-                response.trend = trend.map((t) => toSnakeCase(t as unknown as Record<string, unknown>));
+                response.trend = trend.map(dashboardTrendPoint);
             }
             if (includeModelStats) {
                 const models = await svc.getModelStats(period, startDate, endDate);
-                response.models = models.map((m) => toSnakeCase(m as unknown as Record<string, unknown>));
+                response.models = models.map(dashboardModelStat);
             }
             return legacySuccess(response);
         }
@@ -166,7 +214,16 @@ export async function routeStagedDashboard(
             const granularity = granularityParam === "hour" ? "hour" : "day";
             const trends = await svc.getUserUsageTrend(startDate, endDate, granularity, limit);
             return legacySuccess({
-                trend: trends,
+                trend: trends.map((point) => ({
+                    date: point.date,
+                    user_id: point.userId,
+                    email: point.email,
+                    username: point.username,
+                    requests: point.requests ?? 0,
+                    tokens: point.tokens ?? 0,
+                    cost: point.cost ?? 0,
+                    actual_cost: point.actualCost ?? 0,
+                })),
                 start_date: startDate,
                 end_date: endDate,
                 granularity,
@@ -178,7 +235,19 @@ export async function routeStagedDashboard(
             const rankingStartDate = url.searchParams.get("start_date") ?? undefined;
             const rankingEndDate = url.searchParams.get("end_date") ?? undefined;
             const ranking = await svc.getUserSpendingRanking(period, rankingLimit, rankingStartDate, rankingEndDate);
-            return legacySuccess({ ranking });
+            return legacySuccess({
+                ranking: ranking.map((item) => ({
+                    user_id: item.userId,
+                    username: item.username,
+                    email: item.email,
+                    total_cost: item.totalCost ?? 0,
+                    actual_cost: item.actualCost ?? 0,
+                    total_requests: item.totalRequests ?? 0,
+                    total_tokens: item.totalTokens ?? 0,
+                    requests: item.totalRequests ?? 0,
+                    tokens: item.totalTokens ?? 0,
+                })),
+            });
         }
 
         if (pathname === DASHBOARD_PATHS.usersUsage && method === "POST") {
