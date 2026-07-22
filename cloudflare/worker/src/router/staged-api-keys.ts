@@ -316,7 +316,11 @@ export async function routeStagedApiKeys(
             } else {
                 results = [];
             }
-            return legacySuccess({ items: results });
+            return legacySuccess(results.map((result) => ({
+                id: result.id,
+                name: result.name,
+                user_id: result.userId,
+            })));
         }
 
         return routerError(404, "route_not_found", "Unknown API key route");

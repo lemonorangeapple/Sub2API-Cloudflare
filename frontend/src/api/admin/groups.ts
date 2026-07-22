@@ -54,7 +54,7 @@ export async function getAll(platform?: GroupPlatform): Promise<AdminGroup[]> {
   const { data } = await apiClient.get<AdminGroup[]>('/admin/groups/all', {
     params: platform ? { platform } : undefined
   })
-  return data
+  return Array.isArray(data) ? data : []
 }
 
 /**
@@ -65,7 +65,7 @@ export async function getAllIncludingInactive(): Promise<AdminGroup[]> {
   const { data } = await apiClient.get<AdminGroup[]>('/admin/groups/all', {
     params: { include_inactive: true }
   })
-  return data
+  return Array.isArray(data) ? data : []
 }
 
 /**

@@ -201,7 +201,11 @@ export async function toggleStatus(id: number, status: 'active' | 'disabled'): P
  */
 export async function getUserApiKeys(id: number): Promise<PaginatedResponse<ApiKey>> {
   const { data } = await apiClient.get<PaginatedResponse<ApiKey>>(`/admin/users/${id}/api-keys`)
-  return data
+  return {
+    ...data,
+    items: Array.isArray(data?.items) ? data.items : [],
+    total: Number(data?.total ?? 0),
+  }
 }
 
 /**

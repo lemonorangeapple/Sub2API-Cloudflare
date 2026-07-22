@@ -41,7 +41,11 @@ export async function list(
     },
     signal: options?.signal
   })
-  return data
+  return {
+    ...data,
+    items: Array.isArray(data?.items) ? data.items : [],
+    total: Number(data?.total ?? 0),
+  }
 }
 
 /**
