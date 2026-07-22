@@ -39,6 +39,18 @@ describe('API Client', () => {
       )
     })
 
+    it('将纯 origin 自动补成完整 API base', async () => {
+      vi.resetModules()
+      vi.stubEnv('VITE_API_BASE_URL', 'https://api.example.com')
+
+      const mod = await import('@/api/client')
+
+      expect(mod.apiClient.defaults.baseURL).toBe('https://api.example.com/api/v1')
+      expect(mod.buildApiUrl('/settings/public')).toBe(
+        'https://api.example.com/api/v1/settings/public'
+      )
+    })
+
     it('自动附加 Authorization 头', async () => {
       localStorage.setItem('auth_token', 'my-jwt-token')
 

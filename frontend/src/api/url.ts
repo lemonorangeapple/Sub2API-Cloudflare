@@ -9,7 +9,9 @@ function normalizeAPIBaseURL(value: unknown): string {
   const raw = String(value || DEFAULT_API_BASE_URL).trim() || DEFAULT_API_BASE_URL
   const withoutTrailingSlash = raw.replace(/\/+$/, '')
   if (/^[a-z][a-z\d+.-]*:\/\//i.test(withoutTrailingSlash) || withoutTrailingSlash.startsWith('//')) {
-    return withoutTrailingSlash
+    return withoutTrailingSlash.endsWith('/api/v1')
+      ? withoutTrailingSlash
+      : `${withoutTrailingSlash}/api/v1`
   }
   return normalizePath(withoutTrailingSlash)
 }
