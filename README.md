@@ -213,6 +213,22 @@ openssl rand -base64 32
 openssl rand -hex 32
 ```
 
+### 第五步：设置 CORS 来源（跨域部署时必需）
+
+当前端和 Worker 部署在不同域名时，需要配置 CORS 允许来源：
+
+```bash
+# 允许单个来源
+npx wrangler secret put CORS_ALLOWED_ORIGINS
+# 输入: https://yourdomain.com
+
+# 允许多个来源（逗号分隔）
+npx wrangler secret put CORS_ALLOWED_ORIGINS
+# 输入: https://yourdomain.com,https://admin.yourdomain.com
+```
+
+> **注意**：如果前端和 Worker 在同一域名下（如通过 Cloudflare 路由配置），则无需设置此变量。
+
 ### 第五步：部署 Worker
 
 ```bash
@@ -267,6 +283,7 @@ sub2api-cloudflare/
 │   │   ├── src/
 │   │   │   ├── index.ts         # Worker 入口，路由链
 │   │   │   ├── routes.ts        # 路由分类器
+│   │   │   ├── middleware/      # 中间件（CORS 等）
 │   │   │   ├── router/          # 各路由模块
 │   │   │   ├── services/        # 业务逻辑层
 │   │   │   ├── repositories/    # D1 数据访问层
@@ -338,6 +355,7 @@ npx vue-tsc -b
 | `EMAIL_TASK_ENCRYPTION_KEY` | — | 邮件任务加密（64 位 hex） |
 | `EMAIL_TASK_BATCH_SIZE` | `10` | 邮件任务批量大小 |
 | `SMTP_PASSWORD` | — | SMTP 密码（覆盖 D1 设置） |
+| `CORS_ALLOWED_ORIGINS` | — | CORS 允许的来源（逗号分隔），如 `https://yourdomain.com`；留空则禁用跨域 |
 
 ### 前端
 

@@ -1,3 +1,4 @@
+import { type CORSEnv, buildCORSHeaders, isOriginAllowed } from "./middleware/cors.ts";
 import { routePublicSettings, type PublicSettingsEnv } from "./router/public-settings.ts";
 import { jsonResponse, ROUTER_RESPONSE_HEADER, routerError } from "./router/responses.ts";
 import { routeSetupStatus, type SetupStatusEnv } from "./router/setup-status.ts";
@@ -60,6 +61,7 @@ import { AesGcmEmailSecretCipher } from "./services/email-task-producer.ts";
 import { WorkerSmtpEmailSender, type SmtpSocketConnector } from "./services/smtp-email-sender.ts";
 
 export interface Env extends
+    CORSEnv,
     PublicSettingsEnv,
     SetupStatusEnv,
     StagedAdminSettingsEnv,
@@ -126,6 +128,24 @@ export interface ExecutionContextLike {
     waitUntil(promise: Promise<unknown>): void;
 }
 
+function addCORSHeaders(response: Response, request: Request, env: Env): Response {
+    const origin = request.headers.get("Origin") ?? "";
+    if (!isOriginAllowed(origin, env)) {
+        return response;
+    }
+    const allowAll = env.CORS_ALLOWED_ORIGINS?.includes("*") ?? false;
+    const newHeaders = new Headers(response.headers);
+    const corsHeaders = buildCORSHeaders(origin, allowAll, true);
+    for (const [key, value] of Object.entries(corsHeaders)) {
+        newHeaders.set(key, value);
+    }
+    return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: newHeaders,
+    });
+}
+
 function healthResponse(method: string): Response {
     const body = method === "HEAD" ? null : JSON.stringify({ status: "ok" });
 
@@ -142,6 +162,19 @@ function healthResponse(method: string): Response {
 
 export async function routeRequest(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+
+    // Handle CORS preflight (OPTIONS) early before any routing
+    if (request.method === "OPTIONS") {
+        const origin = request.headers.get("Origin") ?? "";
+        if (isOriginAllowed(origin, env)) {
+            return new Response(null, {
+                status: 204,
+                headers: buildCORSHeaders(origin, env.CORS_ALLOWED_ORIGINS?.includes("*") ?? false, true),
+            });
+        }
+        // If origin not allowed or no CORS config, fall through to normal routing
+    }
+
     if (url.pathname === "/health" && (request.method === "GET" || request.method === "HEAD")) {
         return healthResponse(request.method);
     }
@@ -216,10 +249,10 @@ export async function routeRequest(request: Request, env: Env): Promise<Response
          ?? await routeStagedRiskControl(request, env)
          ?? await routeStagedOps(request, env);
     if (stagedResponse !== null) {
-        return stagedResponse;
+        return addCORSHeaders(stagedResponse, request, env);
     }
 
-    return routerError(404, "route_not_found", "This path is not owned by the worker");
+    return addCORSHeaders(routerError(404, "route_not_found", "This path is not owned by the worker"), request, env);
 }
 
 export async function runScheduledEmailTasks(
