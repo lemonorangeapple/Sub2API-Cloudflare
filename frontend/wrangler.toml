@@ -2,6 +2,10 @@ name = "sub2api-frontend"
 pages_build_output_dir = "./dist"
 compatibility_date = "2026-07-15"
 send_metrics = false
+main = "src/index.ts"
+
+[assets]
+directory = "./dist"
 
 # 部署前在 Cloudflare Dashboard 或 wrangler secret 中设置：
 #   VITE_API_BASE_URL = https://sub2api-router.<your-subdomain>.workers.dev
