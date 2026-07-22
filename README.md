@@ -245,17 +245,19 @@ npx wrangler deploy
 cd frontend
 
 # 设置 Worker API 地址（替换为你的实际 Worker URL）
-WORKER_URL="https://sub2api-router.your-subdomain.workers.dev"
+WORKER_URL="https://sub2api-router.your-subdomain.workers.dev/api/v1"
 
 # 构建时注入 API 地址
-VITE_API_BASE_URL="$WORKER_URL" pnpm build
+VITE_API_BASE_URL="$WORKER_URL"
+
+pnpm build
 
 # 部署到 Cloudflare Pages
 npx wrangler pages deploy dist --project-name=sub2api-frontend
 ```
 
 或者通过 Cloudflare Dashboard 配置：
-1. 在 Pages 项目设置中添加环境变量 `VITE_API_BASE_URL`，值为 Worker URL（如 `https://sub2api-router.xxx.workers.dev`）
+1. 在 Pages 项目设置中添加环境变量 `VITE_API_BASE_URL`，值为 Worker URL（如 `https://sub2api-router.xxx.workers.dev/api/v1`）
 2. 设置构建命令为 `cd frontend && pnpm install && pnpm build`，输出目录为 `frontend/dist`
 3. 每次 Git 推送自动触发构建，环境变量自动注入
 
